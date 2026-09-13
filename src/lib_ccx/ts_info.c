@@ -60,7 +60,9 @@ static void warn_ignored_caption_stream(struct cap_info *iter)
 	if (iter->stream == CCX_STREAM_TYPE_VIDEO_MPEG2 ||
 	    iter->stream == CCX_STREAM_TYPE_VIDEO_H264 ||
 	    iter->stream == CCX_STREAM_TYPE_VIDEO_HEVC)
+	{
 		return;
+	}
 
 	switch (iter->codec)
 	{
@@ -77,9 +79,9 @@ static void warn_ignored_caption_stream(struct cap_info *iter)
 			return;
 	}
 
-	mprint("Warning: %s caption stream ID %u (0x%x) for SID %u (0x%x) will be ignored - only one caption stream per program is extracted.\n",
-	       codec_name, iter->pid, iter->pid, iter->program_number, iter->program_number);
-	mprint("         Use --datapid %u to extract it in a separate run.\n", iter->pid);
+	mprint("Warning: %s caption stream ID %d (0x%x) for SID %d (0x%x) will be ignored - only one caption stream per program is extracted.\n",
+	       codec_name, iter->pid, (unsigned int)iter->pid, iter->program_number, (unsigned int)iter->program_number);
+	mprint("         Use --datapid %d to extract it in a separate run.\n", iter->pid);
 }
 
 void ignore_other_stream(struct ccx_demuxer *ctx, int pid)
@@ -90,7 +92,9 @@ void ignore_other_stream(struct ccx_demuxer *ctx, int pid)
 		if (iter->pid != pid && iter->codec != CCX_CODEC_DVB)
 		{
 			if (!iter->ignore)
+			{
 				warn_ignored_caption_stream(iter);
+			}
 			iter->ignore = 1;
 		}
 	}
@@ -144,7 +148,9 @@ void ignore_other_sib_stream(struct cap_info *head, int pid)
 		if (iter->pid != pid && iter->codec != CCX_CODEC_DVB)
 		{
 			if (!iter->ignore)
+			{
 				warn_ignored_caption_stream(iter);
+			}
 			iter->ignore = 1;
 		}
 	}
