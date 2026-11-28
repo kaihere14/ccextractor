@@ -66,6 +66,28 @@ impl dtvcc_tv_screen {
             writer.writer_ctx.fd
         );
 
+        // Only these formats can be written for CEA-708 (see write()). For
+        // the others, don't create a file that would stay empty, and say once
+        // why the CEA-708 captions are missing.
+        if !matches!(
+            writer.write_format,
+            ccx_output_format::CCX_OF_SRT
+                | ccx_output_format::CCX_OF_SAMI
+                | ccx_output_format::CCX_OF_TRANSCRIPT
+                | ccx_output_format::CCX_OF_SCC
+        ) {
+            static WARNED: std::sync::Once = std::sync::Once::new();
+            WARNED.call_once(|| {
+                if let Some(logger) = lib_ccxr::util::log::logger() {
+                    logger.log_info(&format_args!(
+                        "\n[CEA-708] This output format is not supported for CEA-708 captions, so they are not written. Use srt, sami, ttxt, txt or scc for them.\n"
+                    ));
+                }
+            });
+            self.write_debug();
+            return Ok(());
+        }
+
         #[cfg(unix)]
         if writer.writer_ctx.filename.is_null() && writer.writer_ctx.fd < 0 {
             return Err("Filename missing".to_owned());
@@ -1025,6 +1047,40 @@ mod test {
             .writer_output(&mut writer)
             .expect_err("creating a file over a directory must fail");
         assert!(err.contains(&path), "error should name the file: {}", err);
+        assert_eq!(writer_ctx.fd, -1);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_writer_output_unsupported_format_creates_no_file() {
+        // The CEA-708 writer can't write WebVTT (and other formats), so
+        // writer_output must not leave an empty .p1.svc01.vtt behind.
+        use std::ffi::CString;
+
+        let screen = get_zero_allocated_obj::<dtvcc_tv_screen>();
+        let mut writer_ctx = get_zero_allocated_obj::<dtvcc_writer_ctx>();
+        let transcript_settings = get_zero_allocated_obj::<ccx_encoders_transcript_format>();
+
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let path = dir.path().join("out.p1.svc01.vtt");
+        let filename = CString::new(path.to_str().unwrap()).unwrap();
+        writer_ctx.fd = -1;
+        writer_ctx.filename = filename.as_ptr() as *mut _;
+
+        let mut counter = 0u32;
+        let mut writer = Writer::new(
+            &mut counter,
+            0,
+            ccx_output_format::CCX_OF_WEBVTT,
+            &mut writer_ctx,
+            0,
+            &transcript_settings,
+            0,
+            b"\r\n",
+        );
+
+        assert!(screen.writer_output(&mut writer).is_ok());
+        assert!(!path.exists(), "no file should be created for WebVTT");
         assert_eq!(writer_ctx.fd, -1);
     }
 }
